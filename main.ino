@@ -20,7 +20,7 @@ unsigned long jerkTimeThreshold = 50; // Threshold to check the jerk in a short 
 // Dynamic baseline vibration variables
 float baselineVibrationZ = 0; // Dynamic baseline for Z-axis vibration
 float decayFactor = 0.9; // Decay factor to smooth out baseline changes
-float jerkZThreshold = 150.0; // Threshold for Z-axis jerk detection, adjusted to 150 by default
+float jerkZThreshold = 130.0; // Threshold for Z-axis jerk detection, adjusted to 150 by default
 
 // WiFi credentials
 const char* ssid = "Airtel_mant_2587";
@@ -125,7 +125,7 @@ void loop() {
       digitalWrite(BUZZER_PIN, LOW); // Turn off buzzer
 
       // Measure the pothole depth using the ultrasonic sensor
-      delay(50); // Short delay to stabilize reading
+      // delay(50); // Short delay to stabilize reading
       float depth = sonar.ping_cm();
 
       if (depth > 0) {

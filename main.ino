@@ -22,11 +22,16 @@ float baselineVibrationZ = 0; // Dynamic baseline for Z-axis vibration
 float decayFactor = 0.9; // Decay factor to smooth out baseline changes
 float jerkZThreshold = 150.0; // Threshold for Z-axis jerk detection, adjusted to 150 by default
 
+// WiFi credentials
+const char* ssid = "Airtel_mant_2587";
+const char* password = "Air@43794";
+
 void setup() {
-  Serial.begin(9600);
+  Serial.begin(9600);  // Initialize serial communication for debugging
+  Serial.println("Starting...");
 
   // Initialize the accelerometer
-  if (!accel.begin()) {
+  if (!accel.begin(0x53)) {
     Serial.println("Failed to initialize ADXL345!");
     while (1);
   }
@@ -39,6 +44,28 @@ void setup() {
 
   Serial.println("Pothole Detection System with Dynamic Vibration Adjustment Initialized");
   prevTime = millis(); // Initialize time tracking
+
+  // Initialize ESP8266 and connect to WiFi
+  initESP8266();
+}
+
+void initESP8266() {
+  // Send AT commands to ESP8266 to connect to WiFi
+  Serial.println("AT");
+  delay(1000);
+  
+  Serial.println("AT+CWMODE=1");  // Set WiFi mode to station mode
+  delay(1000);
+
+  Serial.print("AT+CWJAP=\"");
+  Serial.print(ssid);
+  Serial.print("\",\"");
+  Serial.print(password);
+  Serial.println("\"");
+  
+  delay(5000); // Allow time to connect to WiFi
+
+  Serial.println("ESP8266 Initialization Complete");
 }
 
 void loop() {
@@ -84,7 +111,8 @@ void loop() {
     Serial.print("\t|\t");
     Serial.print("Az : ");
     Serial.print(currentAccZ);
-    Serial.print("\t|\t");
+    Serial.print("\t|  ");
+    Serial.print((baselineVibrationZ + jerkZThreshold));
     Serial.println();
 
     // Check for high Z-axis jerk, filtering out baseline vibration
@@ -107,6 +135,9 @@ void loop() {
       } else {
         Serial.println("Depth not measurable");
       }
+
+      // Send data to server (lat, long) once pothole is detected
+      sendDataToServer(); 
     }
 
     // Update previous acceleration and time for the next iteration
@@ -117,4 +148,9 @@ void loop() {
   }
 
   delay(50); // Small delay to give time for the system to stabilize between loops
+}
+
+void sendDataToServer() {
+  // Function to send latitude and longitude using ESP8266
+  // (You can add this based on GPS integration in the next steps)
 }

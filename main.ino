@@ -1,14 +1,27 @@
 #include <Wire.h>
 #include <Adafruit_ADXL345_U.h>
 #include <NewPing.h>
+#include <ESP8266WiFi.h>
+#include <SoftwareSerial.h>
+#include <TinyGPS++.h>
 
-#define TRIG_PIN 9  // Trig pin for ultrasonic sensor
-#define ECHO_PIN 10 // Echo pin for ultrasonic sensor
-#define BUZZER_PIN 2 // Pin for the buzzer
+#define TRIG_PIN D3  // Trig pin for ultrasonic sensor
+#define ECHO_PIN D7 // Echo pin for ultrasonic sensor
+#define BUZZER_PIN D0 // Pin for the buzzer
+#define GPSRX_SDA D5 // Maximum distance to measure (in cm)
+#define GPSTX_SCL D6 // Maximum distance to measure (in cm)
 #define MAX_DISTANCE 200 // Maximum distance to measure (in cm)
 
 Adafruit_ADXL345_Unified accel = Adafruit_ADXL345_Unified(12345);
 NewPing sonar(TRIG_PIN, ECHO_PIN, MAX_DISTANCE);
+
+TinyGPSPlus gps;  // The TinyGPS++ object
+SoftwareSerial ss(GPSRX_SDA, GPSTX_SCL);  // The serial connection to the GPS device
+
+float latitude, longitude;
+int year, month, date, hour, minute, second;
+String date_str, time_str, lat_str, lng_str;
+int pm;
 
 // Variables for jerk calculation
 float prevAccX = 0;    // Previous X-axis acceleration
@@ -28,7 +41,26 @@ const char* password = "Air@43794";
 
 void setup() {
   Serial.begin(9600);  // Initialize serial communication for debugging
+  ss.begin(9600);
   Serial.println("Starting...");
+
+  //Connect to WiFi
+  Serial.println();
+  Serial.print("Connecting to ");
+  Serial.println(ssid);
+  WiFi.begin(ssid, password);
+
+  while (WiFi.status() != WL_CONNECTED)
+  {
+    delay(500);
+    Serial.print(".");
+  }
+
+  Serial.println("");
+  Serial.println("WiFi connected");
+  Serial.println("Server started");
+  // Print the IP address
+  Serial.println(WiFi.localIP());
 
   // Initialize the accelerometer
   if (!accel.begin(0x53)) {
@@ -46,29 +78,91 @@ void setup() {
   prevTime = millis(); // Initialize time tracking
 
   // Initialize ESP8266 and connect to WiFi
-  initESP8266();
+  // initESP8266();
 }
 
-void initESP8266() {
-  // Send AT commands to ESP8266 to connect to WiFi
-  Serial.println("AT");
-  delay(1000);
+// void initESP8266() {
+//   // Send AT commands to ESP8266 to connect to WiFi
+//   Serial.println("AT");
+//   delay(1000);
   
-  Serial.println("AT+CWMODE=1");  // Set WiFi mode to station mode
-  delay(1000);
+//   Serial.println("AT+CWMODE=1");  // Set WiFi mode to station mode
+//   delay(1000);
 
-  Serial.print("AT+CWJAP=\"");
-  Serial.print(ssid);
-  Serial.print("\",\"");
-  Serial.print(password);
-  Serial.println("\"");
+//   Serial.print("AT+CWJAP=\"");
+//   Serial.print(ssid);
+//   Serial.print("\",\"");
+//   Serial.print(password);
+//   Serial.println("\"");
   
-  delay(5000); // Allow time to connect to WiFi
+//   delay(5000); // Allow time to connect to WiFi
 
-  Serial.println("ESP8266 Initialization Complete");
-}
+//   Serial.println("ESP8266 Initialization Complete");
+// }
 
 void loop() {
+
+  while (ss.available() > 0){
+    if (gps.encode(ss.read())){
+
+      if (gps.location.isValid()){
+        latitude = gps.location.lat();
+        lat_str = String(latitude, 6);
+        longitude = gps.location.lng();
+        lng_str = String(longitude, 6);
+      }
+
+      if (gps.date.isValid()){
+        date_str = "";
+        date = gps.date.day();
+        month = gps.date.month();
+        year = gps.date.year();
+
+        if (date < 10) date_str = '0';
+        date_str += String(date);
+        date_str += " / ";
+        if (month < 10) date_str += '0';
+        date_str += String(month);
+        date_str += " / ";
+        if (year < 10) date_str += '0';
+        date_str += String(year);
+      }
+
+      if (gps.time.isValid()){
+        time_str = "";
+        hour = gps.time.hour();
+        minute = gps.time.minute();
+        second = gps.time.second();
+        minute = (minute + 30);
+        if (minute > 59){
+          minute = minute - 60;
+          hour = hour + 1;
+        }
+
+        hour = (hour + 5);
+        if (hour > 23) hour = hour - 24;
+        if (hour >= 12)
+          pm = 1;
+        else
+          pm = 0;
+        hour = hour % 12;
+        if (hour < 10) time_str = '0';
+        time_str += String(hour);
+        time_str += " : ";
+        if (minute < 10) time_str += '0';
+        time_str += String(minute);
+        time_str += " : ";
+        if (second < 10) time_str += '0';
+        time_str += String(second);
+        if (pm == 1)
+          time_str += " PM ";
+        else
+          time_str += " AM ";
+      }
+      
+    }
+  }
+
   sensors_event_t event;
   accel.getEvent(&event);
 
@@ -129,9 +223,18 @@ void loop() {
       float depth = sonar.ping_cm();
 
       if (depth > 0) {
+        Serial.println("-----------------------------");
         Serial.print("Pothole Depth: ");
         Serial.print(depth);
         Serial.println(" cm");
+        Serial.print("Lat : ");
+        Serial.println(lat_str);
+        Serial.print("Long : ");
+        Serial.println(lng_str);
+        Serial.print("Date : ");
+        Serial.println(date_str);
+        Serial.print("Time : ");
+        Serial.println(time_str);
       } else {
         Serial.println("Depth not measurable");
       }
@@ -153,4 +256,4 @@ void loop() {
 void sendDataToServer() {
   // Function to send latitude and longitude using ESP8266
   // (You can add this based on GPS integration in the next steps)
-}
+}\
